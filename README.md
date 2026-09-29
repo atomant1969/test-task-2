@@ -1,61 +1,260 @@
-﻿# Signal App QA — Automated Test
+﻿# Signal App QA — Автотест
 
-Automated test suite for a desktop signal-management application that is part of a distributed control system. The application receives signal values from a remote service over a TCP socket and displays them in a table (ID, name, value, quality, timestamp).
+Набор автотестов для десктоп-приложения управления сигналами, которое является частью распределённой системы управления. Приложение получает значения сигналов от удалённого сервиса через TCP-сокет и отображает их в таблице (ID, имя, значение, качество, время).
 
-This repository contains a pytest-based test that verifies the most critical scenario: **the values displayed in the application match the data sent by the service.**
-
----
-
-## Purpose
-
-The application is part of a distributed control system. If an operator sees incorrect signal values, they make decisions based on false data. This is not a cosmetic bug — it can cause real damage.
-
-The test checks the core promise of the product:
-
-1. The service-simulator sends 10 signals with changing values over TCP (port 2001).
-2. The application connects to the service and displays the signals in a table.
-3. **The test compares the values shown in the application against the values received directly from the service.**
-
-Any mismatch is treated as a defect.
-
-### What the test does NOT cover
-
-This is a focused test, not a full regression suite. It does not check:
-
-- UI layout, styling, or responsiveness
-- Connection loss and reconnection behaviour
-- Quality field semantics (good / bad / uncertain)
-- Timestamp accuracy
-- Invalid or malformed data handling
-- Performance under rapid refresh
-
-These are covered separately — see the checklist in `docs/checklist.md` if you want the full picture.
+В репозитории — тест на pytest, который проверяет самый критичный сценарий: **значения, отображаемые в приложении, совпадают с данными, которые отправляет сервис.**
 
 ---
 
-## Requirements
+## Назначение
+
+Приложение — часть распределённой системы управления. Если оператор видит неверные значения сигналов, он принимает решения по ложным данным. Это не косметический баг — это может привести к реальному ущербу.
+
+Тест проверяет главное обещание продукта:
+
+1. Сервис-симулятор отправляет 10 сигналов с изменяющимися значениями по TCP (порт 2001).
+2. Приложение подключается к сервису и отображает сигналы в таблице.
+3. **Тест сравнивает значения, показанные в приложении, со значениями, полученными напрямую от сервиса.**
+
+Любое расхождение считается дефектом.
+
+### Что тест НЕ покрывает
+
+Это точечный тест, а не полный регрессионный набор. Он не проверяет:
+
+- Верстку, стили и адаптивность интерфейса
+- Потерю соединения и переподключение
+- Семантику поля «качество» (good / bad / uncertain)
+- Точность временных меток
+- Обработку некорректных или битых данных
+- Производительность при частом обновлении
+
+Эти проверки описаны отдельно — полный чек-лист в `docs/checklist.md`.
+
+---
+
+## Требования
 
 - **Python 3.9+**
-- **Windows** (the test uses `pywinauto` with the UIA backend)
-- A running instance of the **service-simulator** on `127.0.0.1:2001`
-- The **desktop application** installed locally
-- The application must be **connectable via UI automation** (standard Win32/UIA controls — not custom-drawn)
+- **Windows** (тест использует `pywinauto` с backend UIA)
+- Запущенный **сервис-симулятор** на `127.0.0.1:2001`
+- Установленное **десктоп-приложение**
+- Приложение должно быть **доступно через UI-автоматизацию** (стандартные Win32/UIA-контролы, не кастомная отрисовка)
 
-### Dependencies
+### Зависимости
 
-| Package     | Purpose                                      |
-|-------------|----------------------------------------------|
-| `pytest`    | Test runner                                   |
-| `pywinauto` | Desktop UI automation (Windows, UIA backend)  |
+| Пакет       | Назначение                                    |
+|-------------|-----------------------------------------------|
+| `pytest`    | Запуск тестов                                  |
+| `pywinauto` | Автоматизация десктопного UI (Windows, UIA)   |
 
-For Linux or macOS, `pywinauto` will not work. Replace the UI layer with `dogtail` (Linux) or `pyautogui` / accessibility APIs (macOS). The service-side logic is platform-independent.
+Для Linux и macOS `pywinauto` не работает. Замените UI-слой на `dogtail` (Linux) или `pyautogui` / API доступности (macOS). Серверная логика не зависит от платформы.
 
 ---
 
-## Installation
+## Установка
 
-### 1. Clone the repository
+### 1. Клонировать репозиторий
 
 ```bash
-git clone https://github.com/<your-username>/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/atomant1969/test-task-2.git
+cd test-task-2
+```
+
+### 2. Создать виртуальное окружение
+
+**Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+**Windows (cmd):**
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+**Linux / macOS:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Установить зависимости
+
+```bash
+pip install -r requirements.txt
+```
+
+Или вручную:
+```bash
+pip install pytest pywinauto
+```
+
+---
+
+## Настройка
+
+### 1. Запустить сервис-симулятор
+
+Симулятор должен быть запущен на `127.0.0.1:2001` до старта теста:
+
+```bash
+python simulator/service_simulator.py
+```
+
+Проверить, что порт открыт:
+
+```bash
+# Windows
+netstat -an | findstr 2001
+
+# Linux / macOS
+lsof -i :2001
+```
+
+### 2. Настроить тест
+
+Откройте `tests/test_signal_values.py` и обновите конфигурацию в начале файла:
+
+```python
+SERVICE_HOST = "127.0.0.1"
+SERVICE_PORT = 2001
+APP_PATH = r"C:\Path\To\SignalApp.exe"   # <-- укажите путь к приложению
+EXPECTED_SIGNAL_COUNT = 10
+```
+
+Скорее всего, придётся также уточнить имена UI-контролов — они зависят от реализации приложения. Используйте **Inspect.exe** (входит в Windows SDK) или **Accessibility Insights**, чтобы найти правильные `control_type`, заголовки окон и кнопок.
+
+Основные места для проверки:
+
+- `app.window(title_re=".*Signal.*")` — паттерн заголовка главного окна
+- `child_window(title="Connect", control_type="Button")` — кнопка «Подключиться»
+- `child_window(title="Refresh", control_type="Button")` — кнопка «Обновить»
+- `child_window(control_type="Table")` — таблица сигналов
+
+### 3. Проверить формат данных от сервиса
+
+Тест парсит ответ сервиса в формате:
+
+```
+ID=1;VALUE=42.5
+ID=2;VALUE=17.3
+...
+```
+
+Если у вашего симулятора другой формат (JSON, бинарный, пакеты фиксированной длины) — обновите парсер в функции `read_reference_signals()`.
+
+---
+
+## Использование
+
+### Запустить все тесты
+
+```bash
+pytest -v
+```
+
+### Запустить только критичный сценарий
+
+```bash
+pytest tests/test_signal_values.py::test_signal_values_match_service -v
+```
+
+### Запустить с выводом в консоль
+
+```bash
+pytest -v -s
+```
+
+### Запустить с увеличенным таймаутом
+
+```bash
+pytest -v --timeout=60
+```
+
+*(Требуется `pytest-timeout`: `pip install pytest-timeout`)*
+
+### Ожидаемый вывод при успехе
+
+```
+tests/test_signal_values.py::test_signal_values_match_service PASSED
+```
+
+### Ожидаемый вывод при падении
+
+```
+AssertionError: Значения сигналов в приложении не совпадают с данными от сервиса:
+ID=3: в приложении 12.4, от сервиса 12.7
+ID=7: в приложении 88.1, от сервиса 88.9
+```
+
+---
+
+## Структура проекта
+
+```
+.
+├── README.md
+├── README_ENG.md
+├── requirements.txt
+├── tests/
+│   └── test_signal_values.py
+├── docs/
+│   ├── checklist.md
+│   └── bug_report_template.md
+└── simulator/
+    └── service_simulator.py
+```
+
+---
+
+## Как работает тест
+
+1. **Читает эталонные данные напрямую от сервиса.**
+   Открывает TCP-соединение к `127.0.0.1:2001`, читает сырые данные сигналов и парсит их в пары `{id: value}`. Это источник истины.
+
+2. **Подключает приложение.**
+   Запускает десктопное приложение через `pywinauto`, ждёт главное окно и нажимает «Подключиться».
+
+3. **Запрашивает обновление.**
+   Нажимает «Обновить» и ждёт, пока таблица обновится.
+
+4. **Считывает значения из таблицы приложения.**
+   Проходит по строкам таблицы и извлекает `{id: value}`.
+
+5. **Сравнивает и делает assert.**
+   Каждый ID сигнала от сервиса должен присутствовать в приложении с совпадающим значением. Допуск `0.01` применяется на округление при отображении. Любое расхождение приводит к падению теста с читаемым списком.
+
+---
+
+## Решение проблем
+
+**`pywinauto.ElementNotFoundError`**
+Имена UI-контролов в тесте не совпадают с реальным приложением. Используйте Inspect.exe, чтобы найти правильные `control_type` и заголовки окон, и обновите селекторы.
+
+**`ConnectionRefusedError` при чтении эталонных сигналов**
+Сервис-симулятор не запущен на порту 2001. Запустите его сначала.
+
+**`AssertionError: Сервис-симулятор вернул N сигналов, ожидалось 10`**
+Либо симулятор не отправляет все 10 сигналов, либо парсер не соответствует реальному формату данных.
+
+**Тест зависает при запуске приложения**
+Приложение может открываться дольше 10 секунд, или паттерн заголовка окна неверный.
+
+**Значения расходятся на копейки (например, 0.001)**
+Округление чисел с плавающей точкой. Расширьте допуск или проверьте, не обрезает ли приложение значения.
+
+---
+
+## О переносимости
+
+- **Серверная логика** (чтение эталонных сигналов) работает на любой ОС с Python.
+- **UI-слой** — только Windows, из-за `pywinauto`.
+
+---
+
+## Лицензия
+
+Внутренний / для конкретного проекта.
